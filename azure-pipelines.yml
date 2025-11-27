@@ -62,3 +62,6 @@ steps:
 
       echo "✔ Todo correcto."
     displayName: "Validar documentación con docs_map.yml"
+    env:
+      # 👇 ESTO ES LO NUEVO: Forzamos la ruta de Git Bash al principio
+      PATH: "C:\\Program Files\\Git\\bin;$(PATH)"
