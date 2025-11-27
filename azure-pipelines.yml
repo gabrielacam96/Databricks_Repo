@@ -93,6 +93,6 @@ steps:
         echo "🟢 RESULTADO: ÉXITO. Todo correcto."
         exit 0
 
-        displayName: "Validación con DEBUG"
-        env:
-          PATH: "C:\\Program Files\\Git\\bin;$(PATH)"
+    displayName: "Validación con DEBUG"
+    env:
+      PATH: "C:\\Program Files\\Git\\bin;$(PATH)"
