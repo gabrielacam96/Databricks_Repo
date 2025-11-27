@@ -16,7 +16,7 @@ steps:
   - checkout: self
     fetchDepth: 2
 
-  - script: |
+  - bash: |
       echo "📘 Leyendo archivo de mapeo docs_map.yml..."
 
       # Convertimos el YAML en pares clave:valor usando awk
