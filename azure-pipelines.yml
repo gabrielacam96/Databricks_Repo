@@ -9,8 +9,9 @@ pr:
       - main
 
 pool:
-  vmImage: 'Gabriela'
-  
+  name: 'Default'
+  demands:
+    - agent.os -equals Windows_NT
 
 steps:
   - checkout: self
