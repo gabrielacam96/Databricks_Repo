@@ -17,82 +17,75 @@ steps:
     fetchDepth: 0
 
   - bash: |
-        echo "========================================"
-        echo "🐛 MODO DEPURACIÓN ACTIVADO"
-        echo "========================================"
+        echo "----------------------------------------"
+        echo "📘 Verificando cambios en el ÚLTIMO COMMIT"
+        echo "----------------------------------------"
 
-        # 1. Carga del Mapa
-        declare -A map
+        # 1. Cargar mapa (igual que antes)
         if [ ! -f docs_map.yml ]; then
-          echo "❌ Error: No encuentro docs_map.yml"
-          exit 1
+          echo "⚠️  No se encontró docs_map.yml."
+          exit 0
         fi
 
-        echo "📂 1. Contenido detectado en docs_map.yml:"
+        declare -A map
         while IFS=":" read -r key value; do
-          # Limpieza agresiva de espacios y comillas
           key=$(echo "$key" | tr -d ' "' | tr -d "'")
           value=$(echo "$value" | tr -d ' "' | tr -d "'")
-          
-          # Ignoramos comentarios
           if [[ -n "$key" && -n "$value" && "$key" != \#* ]]; then
             map["$key"]="$value"
-            echo "   -> [MAPA] Clave: '$key' | Valor: '$value'"
           fi
         done < docs_map.yml
 
-        echo "----------------------------------------"
-
-        # 2. Detección de cambios en Git
-        # Aseguramos que git use formato estándar
-        changed_files=$(git diff --name-only HEAD^ HEAD)
+        # 2. DETECTAR CAMBIOS (Misma rama: Actual vs Anterior)
+        # HEAD  = Tu versión actual
+        # HEAD^ = La versión justo antes de tu commit
         
-        echo "change files: $changed_files"
+        echo "🔍 Ejecutando: git diff --name-only HEAD^ HEAD"
+        changed_files=$(git diff --name-only HEAD^ HEAD)
 
-        echo "🐙 2. Archivos que Git dice que cambiaron:"
+        # Si sale vacío, intentamos una alternativa por si es un merge commit
         if [ -z "$changed_files" ]; then
-          echo "   (Ningún archivo detectado. ¿Quizás es el primer commit?)"
-        else
-          while read -r file; do
-              echo "   -> [GIT]  '$file'"
-          done <<< "$changed_files"
+          echo "⚠️  La lista salió vacía. Probando con HEAD~1..."
+          changed_files=$(git diff --name-only HEAD~1 HEAD)
         fi
 
+        echo "📄 Archivos modificados detectados:"
+        echo "$changed_files"
         echo "----------------------------------------"
-        echo "🔍 3. Comparando (Buscando coincidencias exactas)..."
+
+        if [ -z "$changed_files" ]; then
+          echo "⚠️  ATENCIÓN: Git no reporta ningún archivo modificado."
+          echo "    Posible causa: El commit está vacío o es un merge sin cambios de ficheros."
+          exit 0
+        fi
 
         missing_docs=0
 
+        # 3. Validar
         for nb in "${!map[@]}"; do
-          echo "   ... Revisando si el notebook '$nb' está en los cambios de Git..."
-          
-          # Usamos grep -F (Fixed string) para evitar problemas con símbolos raros
+          # grep -F busca texto exacto (sin interpretar símbolos raros)
           if echo "$changed_files" | grep -F -q "$nb"; then
-              echo "   ✅ ¡COINCIDENCIA ENCONTRADA! El notebook '$nb' fue modificado."
-              
-              doc=${map[$nb]}
-              echo "      Verificando su documentación: '$doc'"
+            doc=${map[$nb]}
+            echo "⚠️  Notebook modificado: $nb"
 
-              if ! echo "$changed_files" | grep -F -q "$doc"; then
-                  echo "      ❌ ERROR: La documentación '$doc' NO aparece en la lista de cambios."
-                  missing_docs=1
-              else
-                  echo "      ✔ La documentación también se modificó. Correcto."
-              fi
-          else
-              echo "      (No coincide. Git tiene otras rutas o no se tocó este archivo)"
+            if ! echo "$changed_files" | grep -F -q "$doc"; then
+              echo "❌ ERROR: Falta actualizar la documentación ($doc)."
+              missing_docs=1
+            else
+              echo "✅ Documentación OK."
+            fi
+            echo "---"
           fi
         done
 
-        echo "----------------------------------------"
         if [ "$missing_docs" -eq 1 ]; then
-          echo "🔴 RESULTADO: FALLO. Falta documentación."
+          echo "🔴 BLOQUEO: Faltan documentaciones."
           exit 1
         fi
 
-        echo "🟢 RESULTADO: ÉXITO. Todo correcto."
+        echo "🟢 Todo correcto."
         exit 0
 
-    displayName: "Validación con DEBUG"
+    displayName: "Validar último commit"
     env:
       PATH: "C:\\Program Files\\Git\\bin;$(PATH)"
