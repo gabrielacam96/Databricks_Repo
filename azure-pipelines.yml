@@ -14,7 +14,7 @@ pool:
 
 steps:
   - checkout: self
-    fetchDepth: 2
+    fetchDepth: 0
 
   - bash: |
         echo "========================================"
