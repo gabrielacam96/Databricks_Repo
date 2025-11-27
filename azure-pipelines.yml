@@ -17,51 +17,82 @@ steps:
     fetchDepth: 2
 
   - bash: |
-      echo "📘 Leyendo archivo de mapeo docs_map.yml..."
+        echo "========================================"
+        echo "🐛 MODO DEPURACIÓN ACTIVADO"
+        echo "========================================"
 
-      # Convertimos el YAML en pares clave:valor usando awk
-      declare -A map
-
-      while IFS=":" read -r key value; do
-        key=$(echo "$key" | xargs)
-        value=$(echo "$value" | xargs)
-        if [[ -n "$key" && -n "$value" ]]; then
-          map["$key"]="$value"
+        # 1. Carga del Mapa
+        declare -A map
+        if [ ! -f docs_map.yml ]; then
+          echo "❌ Error: No encuentro docs_map.yml"
+          exit 1
         fi
-      done < docs_map.yml
 
-      echo "🔍 Notebooks a vigilar:"
-      printf '%s\n' "${!map[@]}"
-
-      changed_files=$(git diff --name-only HEAD^ HEAD)
-
-      echo "📄 Ficheros modificados:"
-      echo "$changed_files"
-
-      missing_docs=0
-
-      for nb in "${!map[@]}"; do
-        if echo "$changed_files" | grep -q "^$nb$"; then
-          doc=${map[$nb]}
-          echo "📌 Notebook modificado: $nb"
-          echo "📌 Doc esperada: $doc"
-
-          if ! echo "$changed_files" | grep -q "^$doc$"; then
-            echo "❌ ERROR: El notebook '$nb' cambió, pero la documentación '$doc' NO se modificó."
-            missing_docs=1
-          else
-            echo "✔ La documentación '$doc' también cambió."
+        echo "📂 1. Contenido detectado en docs_map.yml:"
+        while IFS=":" read -r key value; do
+          # Limpieza agresiva de espacios y comillas
+          key=$(echo "$key" | tr -d ' "' | tr -d "'")
+          value=$(echo "$value" | tr -d ' "' | tr -d "'")
+          
+          # Ignoramos comentarios
+          if [[ -n "$key" && -n "$value" && "$key" != \#* ]]; then
+            map["$key"]="$value"
+            echo "   -> [MAPA] Clave: '$key' | Valor: '$value'"
           fi
+        done < docs_map.yml
+
+        echo "----------------------------------------"
+
+        # 2. Detección de cambios en Git
+        # Aseguramos que git use formato estándar
+        changed_files=$(git diff --name-only HEAD^ HEAD)
+        
+        echo "change files: $changed_files"
+
+        echo "🐙 2. Archivos que Git dice que cambiaron:"
+        if [ -z "$changed_files" ]; then
+          echo "   (Ningún archivo detectado. ¿Quizás es el primer commit?)"
+        else
+          while read -r file; do
+              echo "   -> [GIT]  '$file'"
+          done <<< "$changed_files"
         fi
-      done
 
-      if [ "$missing_docs" -eq 1 ]; then
-        echo "❌ Falta documentación actualizada. Pipeline fallará."
-        exit 1
-      fi
+        echo "----------------------------------------"
+        echo "🔍 3. Comparando (Buscando coincidencias exactas)..."
 
-      echo "✔ Todo correcto."
-    displayName: "Validar documentación con docs_map.yml"
-    env:
-      # 👇 ESTO ES LO NUEVO: Forzamos la ruta de Git Bash al principio
-      PATH: "C:\\Program Files\\Git\\bin;$(PATH)"
+        missing_docs=0
+
+        for nb in "${!map[@]}"; do
+          echo "   ... Revisando si el notebook '$nb' está en los cambios de Git..."
+          
+          # Usamos grep -F (Fixed string) para evitar problemas con símbolos raros
+          if echo "$changed_files" | grep -F -q "$nb"; then
+              echo "   ✅ ¡COINCIDENCIA ENCONTRADA! El notebook '$nb' fue modificado."
+              
+              doc=${map[$nb]}
+              echo "      Verificando su documentación: '$doc'"
+
+              if ! echo "$changed_files" | grep -F -q "$doc"; then
+                  echo "      ❌ ERROR: La documentación '$doc' NO aparece en la lista de cambios."
+                  missing_docs=1
+              else
+                  echo "      ✔ La documentación también se modificó. Correcto."
+              fi
+          else
+              echo "      (No coincide. Git tiene otras rutas o no se tocó este archivo)"
+          fi
+        done
+
+        echo "----------------------------------------"
+        if [ "$missing_docs" -eq 1 ]; then
+          echo "🔴 RESULTADO: FALLO. Falta documentación."
+          exit 1
+        fi
+
+        echo "🟢 RESULTADO: ÉXITO. Todo correcto."
+        exit 0
+
+        displayName: "Validación con DEBUG"
+        env:
+          PATH: "C:\\Program Files\\Git\\bin;$(PATH)"
