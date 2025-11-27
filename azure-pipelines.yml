@@ -1,0 +1,63 @@
+trigger:
+  branches:
+    include:
+      - pre
+
+pr:
+  branches:
+    include:
+      - pre
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - checkout: self
+    fetchDepth: 2
+
+  - script: |
+      echo "📘 Leyendo archivo de mapeo docs_map.yml..."
+
+      # Convertimos el YAML en pares clave:valor usando awk
+      declare -A map
+
+      while IFS=":" read -r key value; do
+        key=$(echo "$key" | xargs)
+        value=$(echo "$value" | xargs)
+        if [[ -n "$key" && -n "$value" ]]; then
+          map["$key"]="$value"
+        fi
+      done < docs_map.yml
+
+      echo "🔍 Notebooks a vigilar:"
+      printf '%s\n' "${!map[@]}"
+
+      changed_files=$(git diff --name-only HEAD^ HEAD)
+
+      echo "📄 Ficheros modificados:"
+      echo "$changed_files"
+
+      missing_docs=0
+
+      for nb in "${!map[@]}"; do
+        if echo "$changed_files" | grep -q "^$nb$"; then
+          doc=${map[$nb]}
+          echo "📌 Notebook modificado: $nb"
+          echo "📌 Doc esperada: $doc"
+
+          if ! echo "$changed_files" | grep -q "^$doc$"; then
+            echo "❌ ERROR: El notebook '$nb' cambió, pero la documentación '$doc' NO se modificó."
+            missing_docs=1
+          else
+            echo "✔ La documentación '$doc' también cambió."
+          fi
+        fi
+      done
+
+      if [ "$missing_docs" -eq 1 ]; then
+        echo "❌ Falta documentación actualizada. Pipeline fallará."
+        exit 1
+      fi
+
+      echo "✔ Todo correcto."
+    displayName: "Validar documentación con docs_map.yml"
