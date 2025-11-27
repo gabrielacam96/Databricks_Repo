@@ -1,0 +1,3 @@
+notebooks/data_cleaning.ipynb: docs/data_cleaning_doc.md
+notebooks/model_training.ipynb: docs/model_training_doc.md
+notebooks/eda.ipynb: docs/eda_overview.md
