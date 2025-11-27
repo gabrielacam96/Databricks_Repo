@@ -9,7 +9,8 @@ pr:
       - main
 
 pool:
-  vmImage: 'Default'
+  vmImage: 'Gabriela'
+  
 
 steps:
   - checkout: self
